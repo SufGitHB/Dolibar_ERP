@@ -1,0 +1,60 @@
+# Dolibarr ERP/CRM - stack locale (127.0.0.1 uniquement)
+# Les secrets sont lus depuis .env (non versionné).
+name: erp-dolibarr
+
+services:
+  mariadb:
+    image: mariadb:11.8            # LTS
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?manquant dans .env}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?manquant dans .env}
+      TZ: Africa/Casablanca
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    # Aucun port publié : MariaDB n'est joignable que depuis le réseau Docker interne.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  dolibarr:
+    image: dolibarr/dolibarr:24.0.2
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      DOLI_INSTALL_AUTO: "1"
+      DOLI_INIT_DEMO: "0"
+      DOLI_PROD: "1"
+      DOLI_DB_TYPE: mysqli
+      DOLI_DB_HOST: mariadb
+      DOLI_DB_HOST_PORT: "3306"
+      DOLI_DB_NAME: ${DB_NAME}
+      DOLI_DB_USER: ${DB_USER}
+      DOLI_DB_PASSWORD: ${DB_PASSWORD}
+      DOLI_ADMIN_LOGIN: ${DOLI_ADMIN_LOGIN}
+      DOLI_ADMIN_PASSWORD: ${DOLI_ADMIN_PASSWORD:?manquant dans .env}
+      DOLI_INSTANCE_UNIQUE_ID: ${DOLI_INSTANCE_UNIQUE_ID}
+      DOLI_URL_ROOT: http://127.0.0.1:${HTTP_PORT:-8080}
+      DOLI_CRON: "0"
+      DOLI_CRON_KEY: ${DOLI_CRON_KEY}
+      PHP_INI_DATE_TIMEZONE: Africa/Casablanca
+      PHP_INI_UPLOAD_MAX_FILESIZE: 10M
+      PHP_INI_POST_MAX_SIZE: 12M
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"   # localhost uniquement
+    volumes:
+      - dolibarr_documents:/var/www/documents
+      - dolibarr_custom:/var/www/html/custom
+
+volumes:
+  mariadb_data:
+  dolibarr_documents:
+  dolibarr_custom:

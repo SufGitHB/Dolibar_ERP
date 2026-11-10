@@ -1,0 +1,8 @@
+.env
+*.env
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
+data/
+documents/
